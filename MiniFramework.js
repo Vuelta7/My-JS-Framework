@@ -32,36 +32,50 @@ function render(vNode) {
 }
 
 function update(newVNode, oldVNode, container) {
-  const updatedVNode = render(newVNode);
+  // Check if there is a oldVNode
+  if (!oldVNode) {
+    const element = render(newVNode);
+    container.appendChild(element);
+    return element;
+  }
 
-  if (oldVNode === null) {
-    container.appendChild(updatedVNode);
-  } else if (oldVNode.type !== newVNode.type) {
-    container.replaceChild(updatedVNode, container.firstChild);
-  } else if (oldVNode.props !== newVNode.props) {
-    for (let key in newVNode.props) {
-      updatedVNode.setAttribute(key, vNode["props"][key]);
-    }
-  } else if (oldVNode.children !== newVNode.children) {
-    for (let i = 0; i < updatedVNode["children"].length; i++) {
-      const child = updatedVNode.children[i];
+  // Check and Update if the type/tag is different
+  if (newVNode.type !== oldVNode.type) {
+    const element = render(newVNode);
+    container.replaceChild(element, container.firstChild);
+    return element;
+  }
 
-      if (typeof child === "object" && child !== null && "type" in child) {
-        let updatedChild = update(
-          newVNode.children[i],
-          oldVNode.children[i],
-          updatedVNode
-        );
+  // Main element
+  const element = container.firstChild;
 
-        updatedVNode.appendChild(updatedChild);
-      } else {
-        const textNode = document.createTextNode(child);
-        updatedVNode.appendChild(textNode);
-      }
+  // Props adding
+  for (let key in newVNode.props) {
+    if (!(key in oldVNode.props)) {
+      element.setAttribute(key, newVNode.props[key]);
     }
   }
 
-  container.appendChild(updatedVNode);
+  // Remover of props that not in newVNode
+  for (let key in oldVNode.props) {
+    if (!(key in newVNode.props)) {
+      element.removeAttribute(key);
+    }
+  }
+
+  // Children recursive update checking
+  for (let i = 0; i < newVNode.children.length; i++) {
+    const newChild = newVNode.children[i];
+    const oldChild = oldVNode.children[i];
+
+    if (typeof newChild === "object") {
+      update(newChild, oldChild, element);
+    } else if (newChild !== oldChild) {
+      element.childNodes[i].textContent = newChild;
+    }
+  }
+
+  return element;
 }
 
 let root = document.getElementById("root");
