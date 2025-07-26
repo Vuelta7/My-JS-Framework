@@ -1,74 +1,85 @@
+// ========== Virtual DOM ========== //
 function createElement(tag, props = {}, ...children) {
-  const vNode = {
+  return {
     type: tag,
     props: props,
-    children: children.flat(), // make the array fully like this [] instead of this [[]]
+    children: children.flat(),
   };
-
-  return vNode;
 }
 
 function render(vNode) {
-  const renderTag = document.createElement(vNode["type"]);
+  const element = document.createElement(vNode.type);
 
   for (let key in vNode.props) {
-    renderTag.setAttribute(key, vNode["props"][key]);
-  }
-
-  for (let i = 0; i < vNode["children"].length; i++) {
-    const child = vNode.children[i];
-
-    if (typeof child === "object" && child !== null && "type" in child) {
-      let childTag = render(child);
-
-      renderTag.appendChild(childTag);
+    if (key.startsWith("on") && typeof vNode.props[key] === "function") {
+      // Real DOM event binding
+      const eventType = key.slice(2).toLowerCase(); // e.g., onclick => click
+      element.addEventListener(eventType, vNode.props[key]);
     } else {
-      const textNode = document.createTextNode(child);
-      renderTag.appendChild(textNode);
+      element.setAttribute(key, vNode.props[key]);
     }
   }
 
-  return renderTag;
+  for (let child of vNode.children) {
+    if (typeof child === "object" && child !== null && "type" in child) {
+      element.appendChild(render(child));
+    } else {
+      element.appendChild(document.createTextNode(child));
+    }
+  }
+
+  return element;
 }
 
 function update(newVNode, oldVNode, container) {
-  // Check if there is a oldVNode
   if (!oldVNode) {
     const element = render(newVNode);
     container.appendChild(element);
     return element;
   }
 
-  // Check and Update if the type/tag is different
   if (newVNode.type !== oldVNode.type) {
     const element = render(newVNode);
     container.replaceChild(element, container.firstChild);
     return element;
   }
 
-  // Main element
   const element = container.firstChild;
 
-  // Props adding
+  // Update props
   for (let key in newVNode.props) {
-    if (!(key in oldVNode.props)) {
-      element.setAttribute(key, newVNode.props[key]);
+    const newVal = newVNode.props[key];
+    const oldVal = oldVNode.props[key];
+
+    if (key.startsWith("on") && typeof newVal === "function") {
+      const eventType = key.slice(2).toLowerCase();
+      if (newVal !== oldVal) {
+        element.removeEventListener(eventType, oldVal);
+        element.addEventListener(eventType, newVal);
+      }
+    } else if (newVal !== oldVal) {
+      element.setAttribute(key, newVal);
     }
   }
 
-  // Remover of props that not in newVNode
+  // Remove old props
   for (let key in oldVNode.props) {
     if (!(key in newVNode.props)) {
-      element.removeAttribute(key);
+      if (key.startsWith("on") && typeof oldVNode.props[key] === "function") {
+        const eventType = key.slice(2).toLowerCase();
+        element.removeEventListener(eventType, oldVNode.props[key]);
+      } else {
+        element.removeAttribute(key);
+      }
     }
   }
 
-  // Children recursive update checking
+  // Update children
   for (let i = 0; i < newVNode.children.length; i++) {
     const newChild = newVNode.children[i];
     const oldChild = oldVNode.children[i];
 
-    if (typeof newChild === "object") {
+    if (typeof newChild === "object" && newChild !== null) {
       update(newChild, oldChild, element);
     } else if (newChild !== oldChild) {
       element.childNodes[i].textContent = newChild;
@@ -78,15 +89,51 @@ function update(newVNode, oldVNode, container) {
   return element;
 }
 
+// ========== useState System ========== //
+let stateList = [];
+let cursor = 0;
 let root = document.getElementById("root");
+let prevVNode = null;
 
-const main = createElement("h1", { id: "hello" }, "Hello!");
+function useState(initialValue) {
+  const currentIndex = cursor;
 
-const mainRendering = render(main);
+  if (stateList[currentIndex] === undefined) {
+    stateList[currentIndex] = initialValue;
+  }
 
-root.appendChild(mainRendering);
+  function setState(newValue) {
+    stateList[currentIndex] = newValue;
+    rerender();
+    console.log(newValue);
+  }
 
-let prevVNode = main;
-const newVNode = createElement("h1", { id: "HI" }, "HI!");
+  const value = stateList[currentIndex];
+  cursor++;
+  return [value, setState];
+}
 
-update(newVNode, prevVNode, root);
+// ========== App + Re-render Logic ========== //
+function App() {
+  const [count, setCount] = useState(0);
+
+  return createElement(
+    "div",
+    {},
+    createElement("h1", {}, `Count: ${count}`),
+    createElement("button", { onclick: () => setCount(count + 1) }, "+")
+  );
+}
+
+function rerender() {
+  cursor = 0;
+  const newVNode = App();
+  root.innerHTML = ""; // Clear previous DOM
+  const newElement = render(newVNode);
+  root.appendChild(newElement);
+  prevVNode = newVNode;
+}
+
+prevVNode = App();
+const initialRender = render(prevVNode);
+root.appendChild(initialRender);
