@@ -1,8 +1,13 @@
 // ========== Virtual DOM ========== //
 function createElement(tag, props = {}, ...children) {
+  if (typeof tag === "function") {
+    // Functional component support
+    return tag({ ...props, children });
+  }
+
   return {
     type: tag,
-    props: props,
+    props,
     children: children.flat(),
   };
 }
@@ -16,7 +21,15 @@ function render(vNode) {
       const eventType = key.slice(2).toLowerCase(); // e.g., onclick => click
       element.addEventListener(eventType, vNode.props[key]);
     } else {
-      element.setAttribute(key, vNode.props[key]);
+      // Handle value separately for form elements
+      if (
+        key === "value" &&
+        (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
+      ) {
+        element.value = vNode.props[key];
+      } else {
+        element.setAttribute(key, vNode.props[key]);
+      }
     }
   }
 
@@ -116,13 +129,26 @@ function useState(initialValue) {
 // ========== App + Re-render Logic ========== //
 function App() {
   const [count, setCount] = useState(0);
+  const [input, setInput] = useState("");
 
   return createElement(
     "div",
     {},
+    Header(),
     createElement("h1", {}, `Count: ${count}`),
-    createElement("button", { onclick: () => setCount(count + 1) }, "+")
+    createElement("button", { onclick: () => setCount(count + 1) }, "+"),
+    createElement("br", {}),
+    createElement("input", {
+      type: "text",
+      value: input,
+      oninput: (e) => setInput(e.target.value),
+    }),
+    createElement("p", {}, `Typed: ${input}`)
   );
+}
+
+function Header() {
+  return createElement("h1", {}, "Hello!");
 }
 
 function rerender() {
