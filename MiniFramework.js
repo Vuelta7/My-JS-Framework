@@ -136,14 +136,7 @@ function App() {
     {},
     Header(),
     createElement("h1", {}, `Count: ${count}`),
-    createElement("button", { onclick: () => setCount(count + 1) }, "+"),
-    createElement("br", {}),
-    createElement("input", {
-      type: "text",
-      value: input,
-      oninput: (e) => setInput(e.target.value),
-    }),
-    createElement("p", {}, `Typed: ${input}`)
+    createElement("button", { onclick: () => setCount(count + 1) }, "+")
   );
 }
 
